@@ -1,0 +1,43 @@
+name: Crear exe
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Quitar la lista local de códigos si usas el servidor de canje
+        shell: bash
+        run: node -e "const c=require('./config.json');if(c.codes&&c.codes.url){require('fs').rmSync('src/codes.json',{force:true});console.log('codes.json eliminado del instalador')}"
+      - name: Instalar dependencias
+        shell: bash
+        run: npm install --ignore-scripts
+      - name: Descargar Electron (con reintentos)
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5; do
+            if node node_modules/electron/install.js; then exit 0; fi
+            echo "Intento $i falló, reintentando..."; sleep 30
+          done
+          exit 1
+      - name: Crear instalador (con reintentos)
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            if npx electron-builder --win nsis --publish never; then exit 0; fi
+            echo "Intento $i falló, reintentando..."; sleep 30
+          done
+          exit 1
+      - name: Huella SHA-256 del instalador
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/*.exe | ForEach-Object {
+            $h = (Get-FileHash $_.FullName -Algorithm SHA256).Hash
+            "$($_.Name)  SHA-256: $h" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SarexStudioLauncher-instalador
+          path: dist/*.exe
