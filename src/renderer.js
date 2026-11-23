@@ -306,7 +306,7 @@ let codeBusy = false;
 async function submitCode() {
   if (codeBusy || codeVal().length !== 6) return; codeBusy = true; $('codeOk').disabled = true; $('codeErr').textContent = '';
   const r = await sarex.invoke('code-redeem', codeVal()); codeBusy = false;
-  if (r.ok) { $('plus').classList.add('ok'); sfx.ok(); confetti(); setTimeout(() => { $('codeModal').hidden = true; S.codePending = false; refreshAccount(); if (S.account) { say('Todo listo.'); refreshMine(); } }, 1100); }
+  if (r.ok) { $('plus').classList.add('ok'); sfx.ok(); confetti(); setTimeout(() => { $('codeModal').hidden = true; S.codePending = false; const f = S.afterCode; S.afterCode = null; refreshAccount(); if (f) f(); if (S.account) { say('Todo listo.'); refreshMine(); } }, 1100); }
   else { $('codeErr').textContent = r.error; $('otp').classList.add('bad'); sfx.err(); setTimeout(() => { $('otp').classList.remove('bad'); otp.forEach(i => i.value = ''); updCode(); otp[0].focus(); }, 520); }
 }
 $('codeOk').onclick = submitCode; $('codeNo').onclick = () => sarex.invoke('win-ctl', 'close');
@@ -382,10 +382,11 @@ function renderInstGrid() {
     body.append(el('h3', '', i.name), el('p', 'small', i.desc), btn, prog, msg); c.append(im, body); g.append(c);
     btn.onclick = async () => {
       if (S.installed.includes(i.id)) { S.cur = i.id; show('inst'); return; }
+      if (S.codePending) { S.afterCode = () => btn.click(); openCode(); return; }
       btn.disabled = true; btn.textContent = 'Instalando…'; prog.hidden = false; msg.className = 'msg'; msg.textContent = 'Preparando…'; S.instUI = { fill, msg };
       const r = await sarex.invoke('inst-install', i.id); S.instUI = null;
       if (r.ok) { S.installed.push(i.id); sfx.ok(); renderRail(); renderInstGrid(); homeState(); S.cur = i.id; show('inst'); }
-      else { btn.disabled = false; btn.textContent = 'Instalar'; msg.className = 'msg err'; msg.textContent = r.error === 'NEED_CODE' ? 'Escribe tu código de acceso otra vez.' : r.error; }
+      else { btn.disabled = false; btn.textContent = 'Instalar'; msg.className = 'msg err'; msg.textContent = r.error === 'NEED_CODE' ? 'Escribe tu código de acceso.' : r.error; if (r.error === 'NEED_CODE') { S.codePending = true; S.afterCode = () => btn.click(); openCode(); } }
     };
   }
 }

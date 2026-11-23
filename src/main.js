@@ -231,7 +231,8 @@ async function syncSkins(name) { // deja las skins de todos los amigos donde Cus
 // ---------- Códigos de acceso (6 dígitos, un solo uso) ----------
 const codeUrl = () => CFG.codes && okUrl(CFG.codes.url) ? CFG.codes.url : '';
 const accessRequired = () => !!(CFG.codes && CFG.codes.required !== false && (codeUrl() || LOCAL_CODES.hashes.length));
-const accessOk = () => !accessRequired() || !!(readSettings().access && readSettings().access.ok);
+let sessionAccess = false; // el acceso vale solo mientras el launcher está abierto: hay que escribir el código cada vez que se entra
+const accessOk = () => !accessRequired() || sessionAccess;
 handle('code-redeem', async (_e, code) => {
   code = String(code || '').trim(); if (!/^\d{6}$/.test(code)) return { ok: false, error: 'El código tiene 6 números.' };
   const s = readSettings(), device = s.deviceId || crypto.randomUUID(), now = Date.now();
@@ -245,7 +246,7 @@ handle('code-redeem', async (_e, code) => {
     } catch { return { ok: false, error: 'No se pudo verificar el código. Revisa tu conexión.' }; }
   } else good = LOCAL_CODES.hashes.includes(crypto.createHash('sha256').update(LOCAL_CODES.salt + code).digest('hex'));
   if (!good) { const f = (s.codeFails || 0) + 1; saveSettings({ ...s, deviceId: device, codeFails: f >= 8 ? 0 : f, codeLock: f >= 8 ? now + 10 * 60 * 1000 : 0 }); return { ok: false, error: 'Código no válido.' }; }
-  saveSettings({ ...s, deviceId: device, codeFails: 0, codeLock: 0, ...(newKey ? { modKey: newKey } : {}), access: { ok: true, at: new Date().toISOString() } }); return { ok: true };
+  saveSettings({ ...s, deviceId: device, codeFails: 0, codeLock: 0, ...(newKey ? { modKey: newKey } : {}), access: undefined }); sessionAccess = true; return { ok: true };
 });
 
 // ---------- Estado de Discord ----------
@@ -399,7 +400,7 @@ handle('admin-folder', (_e, which) => {
 });
 handle('open-shots', () => { const d = path.join(ROOT, 'screenshots'); fs.mkdirSync(d, { recursive: true }); shell.openPath(d); return true; });
 async function install() {
-  if (!accessOk()) throw new Error('Introduce tu código de acceso primero.');
+  if (!accessOk()) throw new Error('NEED_CODE');
   if (manifest._sigFail) throw new Error('La lista de mods no tiene una firma válida. Por seguridad no se instaló nada. Avisa a Sarex Studio.');
   const java = await ensureJava();
   const fabric = await ensureFabric();
@@ -532,10 +533,11 @@ const rm = p => fs.rmSync(p, { recursive: true, force: true });
 handle('clean-logs', () => { rm(path.join(ROOT, 'logs')); rm(path.join(ROOT, 'crash-reports')); return true; });
 handle('wipe', () => { // borra todo rastro personal de este equipo (no toca el juego ni los mods)
   memToken = null; const keep = readSettings(); for (const p of [SETTINGS, SKIN_DIR, path.join(ROOT, 'CustomSkinLoader'), path.join(ROOT, 'logs'), path.join(ROOT, 'crash-reports')]) rm(p);
-  saveSettings({ eula: keep.eula, deviceId: keep.deviceId, access: keep.access }); // el acceso y el EULA se conservan
+  saveSettings({ eula: keep.eula, deviceId: keep.deviceId }); // el EULA se conserva; el código se pide cada vez que se abre el launcher
   return true;
 });
 handle('inst-install', (_e, id) => guard(async () => {
+  if (!accessOk()) throw new Error('NEED_CODE');
   const ea = readSettings().eula; if (!ea || ea.version !== EULA_VER) throw new Error('Primero debes aceptar el EULA de Minecraft.');
   if (!(CFG.instances || []).some(i => i.id === id)) throw new Error('Instancia desconocida.');
   await loadManifest(); await install();
@@ -544,7 +546,7 @@ handle('inst-install', (_e, id) => guard(async () => {
 handle('update', () => guard(async () => { await loadManifest(); await install(); status('Todo al día', 1); }));
 handle('play', () => guard(async () => {
   const ea = readSettings().eula; if (!ea || ea.version !== EULA_VER) throw new Error('Primero debes aceptar el EULA de Minecraft.');
-  if (!accessOk()) throw new Error('Introduce tu código de acceso primero.');
+  if (!accessOk()) throw new Error('NEED_CODE');
   const auth = await getAuth(); await loadManifest();
   const { java, fabric } = await install();
   if (updatesOn()) { const c = await checkPack(); if (c.tamper) throw new Error(c.error); if (c.available) await applyPack(); }

@@ -12,17 +12,17 @@
   ],
   "server": {
     "name": "SarexSafio",
-    "host": "sarexsafio.hovyhosting.com",
+    "host": "149.202.84.78",
     "port": 25641
   },
   "discord": {
-    "clientId": "1570259617936838776",
-    "invite": "https://discord.gg/7wY3KB3xPk"
+    "clientId": "",
+    "invite": ""
   },
   "edition": "1",
   "codes": {
     "required": true,
-    "url": "aged-disk-31cd.peneconrizos.workers.dev"
+    "url": ""
   },
   "instances": [
     {
@@ -36,7 +36,7 @@
     "hash": "853bb934122f745023d738e6d4dc94a44b1cc838a03955c3f21fafd935118565"
   },
   "updates": {
-    "repo": "https://github.com/sarexmc/LauncherDEFINITIVO",
+    "repo": "",
     "branch": "main"
   }
 }
