@@ -16,13 +16,13 @@
     "port": 25641
   },
   "discord": {
-    "clientId": "",
+    "clientId": "1570259617936838776",
     "invite": ""
   },
   "edition": "1",
   "codes": {
     "required": true,
-    "url": "https://aged-disk-31cd.peneconrizos.workers.dev"
+    "url": "aged-disk-31cd.peneconrizos.workers.dev"
   },
   "instances": [
     {
