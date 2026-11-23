@@ -16,19 +16,19 @@
     "port": 25641
   },
   "discord": {
-    "clientId": "1570259617936838776",
+    "clientId": "",
     "invite": ""
   },
   "edition": "1",
   "codes": {
     "required": true,
-    "url": "aged-disk-31cd.peneconrizos.workers.dev"
+    "url": "https://aged-disk-31cd.peneconrizos.workers.dev"
   },
   "instances": [
     {
       "id": "sarexsafio1",
       "name": "SarexSafio 1",
-      "desc": "SAREXsafio 1, serie inspirada en DEDsafio"
+      "desc": "Minecraft 1.21.1 con Fabric. Incluye todos los mods del servidor."
     }
   ],
   "admin": {

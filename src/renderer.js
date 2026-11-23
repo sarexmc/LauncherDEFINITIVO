@@ -431,3 +431,15 @@ $('tokBtn').onclick = async () => { if (!(await askAdmin())) return; $('tokIn').
 $('tokNo').onclick = () => { $('tokModal').hidden = true; };
 async function saveTok() { const r = await sarex.invoke('admin-token', $('tokIn').value); if (r.ok) { $('tokModal').hidden = true; pubMsg('Token guardado.'); adminInfo(); } else $('tokErr').textContent = r.error; }
 $('tokOk').onclick = saveTok; $('tokIn').onkeydown = e => { if (e.key === 'Enter') saveTok(); };
+
+// ---------- Administrador: cargar .mrpack ----------
+function mrMsg(t, err) { $('mrMsg').textContent = t || ''; $('mrMsg').style.color = err ? '' : 'var(--mut)'; }
+async function importMr(file) {
+  if (!(await askAdmin())) return; mrMsg('Procesando el modpack…'); $('mrBtn').disabled = true;
+  const r = await sarex.invoke('mrpack-import', file || null); $('mrBtn').disabled = false;
+  if (r.ok) { mrMsg('Modpack cargado en SarexSafio.'); sfx.ok(); } else if (r.error !== 'Cancelado.') mrMsg(r.error, true); else mrMsg(''); adminInfo();
+}
+$('mrBtn').onclick = () => importMr(null);
+['dragover', 'drop'].forEach(ev => document.addEventListener(ev, e => e.preventDefault()));
+$('mrDrop').addEventListener('drop', e => { const f = e.dataTransfer.files[0]; const p = f && sarex.pathOf(f); if (p && /\.mrpack$/i.test(p)) importMr(p); else mrMsg('Suelta un archivo .mrpack.', true); });
+sarex.on('progress', d => { if ($('mrBtn').disabled && d.text) mrMsg(d.text); });

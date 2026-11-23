@@ -121,6 +121,12 @@
         <div class="btnrow"><button class="btn" id="modfix">Verificar y reparar</button><button class="btn ghost" id="chkBtn">Buscar actualizaciones</button><button class="btn ghost" id="modfolder">🔒 Carpeta de mods (administrador)</button></div>
         <p class="note">Cada mod se comprueba con su huella digital (sha1). Si borras o cambias un mod, el launcher lo restaura solo, y la carpeta solo se abre con el código de administrador. Los mods que no son del pack se eliminan para que todos jueguen igual.</p>
       </div>
+      <div class="card" style="margin-top:16px"><h3>Cargar modpack (.mrpack)</h3>
+        <p class="small">Arrastra aquí tu archivo .mrpack o pulsa el botón. Los mods se instalan en SarexSafio y, si ya configuraste el token y la llave, puedes publicarlos para todos con un clic.</p>
+        <div id="mrDrop" class="btnrow" style="border:2px dashed var(--mut);border-radius:14px;padding:22px;justify-content:center;text-align:center">Suelta el archivo .mrpack aquí</div>
+        <div class="btnrow"><button class="btn primary" id="mrBtn">🔒 Elegir archivo .mrpack</button></div>
+        <p class="err" id="mrMsg"></p>
+      </div>
       <div class="card" style="margin-top:16px"><h3>Administrador: publicar actualización</h3>
         <p class="small" id="adminInfo">Elige la carpeta con tus mods y se publica para todos los jugadores, cifrada y firmada.</p>
         <input id="pubNote" placeholder="Nota de la actualización (opcional)" maxlength="120" spellcheck="false">

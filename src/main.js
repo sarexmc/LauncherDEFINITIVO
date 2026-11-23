@@ -5,6 +5,7 @@ const { Client, Authenticator } = require('minecraft-launcher-core');
 const { Auth } = require('msmc');
 const { Presence } = require('./discord');
 const PU = require('./packupdate');
+const MRP = require('./mrpack');
 let autoUpdater = null; try { autoUpdater = require('electron-updater').autoUpdater; } catch {}
 
 app.enableSandbox();
@@ -233,9 +234,18 @@ const codeUrl = () => CFG.codes && okUrl(CFG.codes.url) ? CFG.codes.url : '';
 const accessRequired = () => !!(CFG.codes && CFG.codes.required !== false && (codeUrl() || LOCAL_CODES.hashes.length));
 let sessionAccess = false; // el acceso vale solo mientras el launcher está abierto: hay que escribir el código cada vez que se entra
 const accessOk = () => !accessRequired() || sessionAccess;
+// Identificador del PC: sale del MachineGuid de Windows (no se puede "copiar" copiando settings.json a otro PC).
+function machineId(s) {
+  try {
+    const out = execFileSync('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'], { encoding: 'utf8', windowsHide: true, timeout: 4000 });
+    const m = /MachineGuid\s+REG_SZ\s+([\w-]+)/i.exec(out);
+    if (m) return crypto.createHash('sha256').update('sarex-device:' + m[1].toLowerCase()).digest('hex');
+  } catch {}
+  return crypto.createHash('sha256').update('sarex-fallback:' + os.hostname() + os.userInfo().username + (os.cpus()[0] || {}).model + os.totalmem()).digest('hex');
+}
 handle('code-redeem', async (_e, code) => {
   code = String(code || '').trim(); if (!/^\d{6}$/.test(code)) return { ok: false, error: 'El código tiene 6 números.' };
-  const s = readSettings(), device = s.deviceId || crypto.randomUUID(), now = Date.now();
+  const s = readSettings(), device = machineId(s), now = Date.now();
   if ((s.codeLock || 0) > now) return { ok: false, error: 'Demasiados intentos. Prueba en unos minutos.' };
   let good = false, newKey = null;
   if (codeUrl()) {
@@ -355,7 +365,7 @@ handle('pack-publish', (_e, note) => guard(async () => {
   if (adminUntil < Date.now()) throw new Error('Desbloquea el modo administrador primero.');
   const s = readSettings(); if (!s.ghToken || !s.signKey) throw new Error('Falta guardar el token de GitHub y la llave de firma (botones de abajo).');
   if (!updatesOn()) throw new Error('Falta updates.repo y publicKey en config.json.');
-  const key = modKey(); if (!key) throw new Error('Esta cuenta no tiene la clave de los mods. La primera vez usa tools/pack-mods.js y tu código de acceso.');
+  const key = modKey(); if (!key) throw new Error('Falta la clave de los mods. Cierra el launcher, ábrelo y escribe un código de acceso (el servidor debe tener MODKEY).');
   const r = await dialog.showOpenDialog(win, { title: 'Elige la carpeta con tus mods (.jar)', properties: ['openDirectory'] }); if (r.canceled) throw new Error('Publicación cancelada.');
   const files = fs.readdirSync(r.filePaths[0]).filter(f => f.toLowerCase().endsWith('.jar')); if (!files.length) throw new Error('Esa carpeta no tiene archivos .jar.');
   const jars = files.map(f => fs.readFileSync(path.join(r.filePaths[0], f)));
@@ -363,6 +373,38 @@ handle('pack-publish', (_e, note) => guard(async () => {
   const out = await PU.publish({ jars, key, privPem: dec(s.signKey), gh: PU.github(CFG.updates.repo, dec(s.ghToken)), prevVersion: prev, note: String(note || '').slice(0, 120), onProgress: (i, n) => status(`Publicando ${i + 1}/${n}`, i / n) });
   fs.mkdirSync(path.dirname(PACK_DL), { recursive: true }); fs.writeFileSync(PACK_DL, out.container); cleanBundled();
   saveSettings({ ...readSettings(), packVersion: out.version }); status(`Versión ${out.version} publicada. Los jugadores la recibirán en unos minutos.`, 1);
+}));
+// ---------- Cargar un .mrpack en SarexSafio (y publicarlo para todos si ya está configurado) ----------
+async function fetchBuf(url) {
+  if (!okUrl(url)) throw new Error('Enlace no seguro (debe ser https): ' + url);
+  const r = await fetch(url, { redirect: 'follow', headers: UA }); if (!r.ok) throw new Error(`No se pudo descargar (${r.status}): ${url}`);
+  return Buffer.from(await r.arrayBuffer());
+}
+handle('mrpack-import', (_e, dropped) => guard(async () => {
+  if (adminUntil < Date.now()) throw new Error('Desbloquea el modo administrador primero.');
+  const key = modKey(); if (!key) throw new Error('Falta la clave de los mods. Cierra el launcher, ábrelo y escribe un código de acceso (el servidor debe tener MODKEY).');
+  let file = typeof dropped === 'string' && path.isAbsolute(dropped) && /\.mrpack$/i.test(dropped) && fs.existsSync(dropped) ? dropped : null;
+  if (!file) { const r = await dialog.showOpenDialog(win, { title: 'Elige tu modpack (.mrpack)', filters: [{ name: 'Modpack de Modrinth', extensions: ['mrpack'] }], properties: ['openFile'] }); if (r.canceled) throw new Error('Cancelado.'); file = r.filePaths[0]; }
+  status('Leyendo el modpack…', 0.02);
+  const zip = MRP.readZip(fs.readFileSync(file)), pack = MRP.parse(zip, { minecraft: CFG.minecraft });
+  const { jars, others } = await MRP.fetchAll(pack, zip, { okHost, fetchBuf, onProgress: (i, n, f) => status(`Descargando ${i + 1}/${n}: ${f.replace(/^mods\//, '')}`, 0.05 + 0.8 * i / Math.max(n, 1)) });
+  if (!jars.length) throw new Error('Ese modpack no trae mods (.jar).');
+  status('Guardando en SarexSafio…', 0.9);
+  for (const o of others) { const dest = path.join(ROOT, ...o.rel.split('/')); if (!dest.startsWith(ROOT + path.sep)) continue; fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, o.data); }
+  const s = readSettings(), canPublish = !!(s.ghToken && s.signKey && updatesOn());
+  fs.mkdirSync(path.dirname(PACK_DL), { recursive: true });
+  let publish = false;
+  if (canPublish) { const c = await dialog.showMessageBox(win, { type: 'question', buttons: ['Publicar para todos', 'Solo en este PC'], defaultId: 0, cancelId: 1, title: 'Cargar modpack', message: `${pack.name}: ${jars.length} mods listos.`, detail: '¿Quieres que todos los jugadores reciban esta actualización?' }); publish = c.response === 0; }
+  if (publish) {
+    let prev = s.packVersion || 0; try { const m = await PU.fetchMeta(rawBase(), CFG.publicKey); if (m) prev = Math.max(prev, m.version); } catch {}
+    const out = await PU.publish({ jars, key, privPem: dec(s.signKey), gh: PU.github(CFG.updates.repo, dec(s.ghToken)), prevVersion: prev, note: `${pack.name} ${pack.version}`.trim().slice(0, 120), onProgress: (i, n) => status(`Publicando ${i + 1}/${n}`, 0.9 + 0.1 * i / n) });
+    fs.writeFileSync(PACK_DL, out.container); saveSettings({ ...readSettings(), packVersion: out.version });
+    status(`Listo: ${jars.length} mods en SarexSafio y publicados para todos (versión ${out.version}).`, 1);
+  } else {
+    fs.writeFileSync(PACK_DL, PU.buildContainer(jars, key));
+    status(`Listo: ${jars.length} mods cargados en SarexSafio` + (canPublish ? ' (solo en este PC).' : '. Para publicarlos a todos falta guardar el token de GitHub y la llave de firma.'), 1);
+  }
+  cleanBundled();
 }));
 // ---------- Actualización del propio launcher (GitHub Releases) ----------
 function initUpdater() {
