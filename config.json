@@ -1,8 +1,8 @@
 {
   "name": "Sarex Studio Launcher",
   "minecraft": "1.21.1",
-  "manifestUrl": "https://raw.githubusercontent.com/TU_USUARIO/sarex-pack/main/manifest.json",
-  "publicKey": "",
+  "manifestUrl": "https://raw.githubusercontent.com/sarexmc/LauncherDEFINITIVO/main/manifest.json",
+  "publicKey": "MCowBQYDK2VwAyEAeCEfgZ1ItbKUHOl0pryCuThS00raunXyzockmBWrV70=",
   "allowedHosts": [
     "github.com",
     "raw.githubusercontent.com",
@@ -16,19 +16,19 @@
     "port": 25641
   },
   "discord": {
-    "clientId": "",
+    "clientId": "1570259617936838776",
     "invite": ""
   },
   "edition": "1",
   "codes": {
     "required": true,
-    "url": ""
+    "url": "aged-disk-31cd.peneconrizos.workers.dev"
   },
   "instances": [
     {
       "id": "sarexsafio1",
       "name": "SarexSafio 1",
-      "desc": "Minecraft 1.21.1 con Fabric. Incluye todos los mods del servidor."
+      "desc": "SAREXsafio 1, serie inspirada en DEDsafio"
     }
   ],
   "admin": {
@@ -36,7 +36,7 @@
     "hash": "853bb934122f745023d738e6d4dc94a44b1cc838a03955c3f21fafd935118565"
   },
   "updates": {
-    "repo": "",
+    "repo": "https://github.com/sarexmc/LauncherDEFINITIVO",
     "branch": "main"
   }
 }
